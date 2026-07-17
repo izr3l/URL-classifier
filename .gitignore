@@ -1,0 +1,30 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Extension build outputs
+extension/background/service-worker.js
+extension/content/content-script.js
+extension/popup/Popup.js
+extension/*.wasm
+!extension/model/*.onnx
+
+# Python dependencies and environments
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Data and Artifacts
+data/
+artifacts/
+phishing-url-classifier-spec.md
+
+# OS specific
+.DS_Store
+Thumbs.db
