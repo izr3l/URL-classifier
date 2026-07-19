@@ -15,11 +15,12 @@ type Signal = {
 };
 
 const FEATURE_LABELS: Record<string, string> = {
+  brand_in_registered_domain: 'Brand impersonation detected in domain',
+  brand_in_subdomain: 'Brand name found in subdomain',
   suspicious_keyword_count: 'Suspicious keyword in path or query',
   url_entropy: 'High URL entropy',
   hostname_entropy: 'High domain entropy',
   is_ip_address: 'IP address used as hostname',
-  brand_in_subdomain: 'Brand name found in subdomain',
   lookalike_char_detected: 'Lookalike characters detected',
   encoded_url_in_path: 'Encoded URL/redirect pattern found',
   at_symbol_present: '@ symbol present in URL',
@@ -30,11 +31,12 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 
 const IMPORTANCE_HINT: Record<string, number> = {
+  brand_in_registered_domain: 0.25,
+  brand_in_subdomain: 0.20,
   suspicious_keyword_count: 0.19,
   url_entropy: 0.15,
   hostname_entropy: 0.12,
   is_ip_address: 0.11,
-  brand_in_subdomain: 0.1,
   lookalike_char_detected: 0.09,
   encoded_url_in_path: 0.08,
   at_symbol_present: 0.07,
@@ -67,11 +69,40 @@ function buildSignals(features: number[]): Signal[] {
     .map((entry) => ({ title: entry.title, value: entry.value }));
 }
 
+const REPOSITORY_URL = 'https://github.com/izr3l/URL-classifier';
+
+function buildIssueUrl(type: 'fp' | 'fn', currentUrl: string, score: number): string {
+  const isFP = type === 'fp';
+  const scorePercent = Math.round(score * 100);
+  const label = riskLabel(score);
+
+  const title = `${isFP ? 'False Positive' : 'False Negative'}: ${currentUrl}`;
+  const body = [
+    `### ${isFP ? 'False Positive Report' : 'False Negative Report'}`,
+    ``,
+    `**Scanned URL:** \`${currentUrl}\``,
+    `**Current Classification:** ${scorePercent}% (${label})`,
+    ``,
+    `**Feedback:**`,
+    isFP
+      ? `This site is safe/legitimate, but was misclassified as risky.`
+      : `This site is an active phishing/malicious link, but was marked as safe.`
+  ].join('\n');
+
+  return `${REPOSITORY_URL}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
+
 function Popup(): React.JSX.Element {
   const [tabState, setTabState] = React.useState<StoredTabState | null>(null);
   const [loading, setLoading] = React.useState(true);
 
+  const [modelError, setModelError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
+    chrome.storage.session.get(['model_error'], (items) => {
+      if (items.model_error) setModelError(items.model_error);
+    });
+
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
       const tabId = tab?.id;
@@ -148,24 +179,49 @@ function Popup(): React.JSX.Element {
       </section>
 
       <section className="section actions">
+        {modelError && (
+          <div style={{ color: 'red', fontSize: '10px', marginBottom: '8px', wordBreak: 'break-all' }}>
+            Error: {modelError}
+          </div>
+        )}
         <a
-          className="button"
-          href="https://github.com/example/phishing-url-shield/issues/new?title=False%20Positive"
+          className="button button-fp"
+          href={buildIssueUrl('fp', tabState.url, tabState.score)}
           target="_blank"
           rel="noreferrer"
         >
-          Report false positive
+          <div className="button-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+          </div>
+          <div className="button-content">
+            <span className="button-title">Report false positive</span>
+            <span className="button-subtext">Site is safe — flagged by mistake</span>
+          </div>
         </a>
+
         <a
-          className="button"
-          href="https://github.com/example/phishing-url-shield/issues/new?title=False%20Negative"
+          className="button button-fn"
+          href={buildIssueUrl('fn', tabState.url, tabState.score)}
           target="_blank"
           rel="noreferrer"
         >
-          Report false negative
+          <div className="button-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <div className="button-content">
+            <span className="button-title">Report false negative</span>
+            <span className="button-subtext">Site is phishing — missed threat</span>
+          </div>
         </a>
         <div className="privacy">
-          <a href="https://example.com/privacy" target="_blank" rel="noreferrer">
+          <a href="https://github.com/izr3l/URL-classifier#privacy-policy" target="_blank" rel="noreferrer">
             Privacy policy: all inference runs locally in your browser
           </a>
         </div>

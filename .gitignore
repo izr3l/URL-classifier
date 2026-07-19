@@ -7,7 +7,9 @@ yarn-error.log
 extension/background/service-worker.js
 extension/content/content-script.js
 extension/popup/Popup.js
+extension/offscreen/offscreen.js
 extension/*.wasm
+extension/*.mjs
 !extension/model/*.onnx
 
 # Python dependencies and environments

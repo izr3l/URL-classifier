@@ -10,43 +10,29 @@ import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-PHISHTANK_URL = "http://data.phishtank.com/data/online-valid.csv.bz2"
+OPENPHISH_URL = "https://openphish.com/feed.txt"
 TRANCO_URL = "https://tranco-list.eu/top-1m.csv.zip"
 
-def download_phishtank(output_file: Path) -> None:
-    logging.info(f"Downloading PhishTank data from {PHISHTANK_URL}")
-    req = Request(PHISHTANK_URL, headers={'User-Agent': 'Mozilla/5.0'})
+def download_openphish(output_file: Path) -> None:
+    logging.info(f"Downloading OpenPhish data from {OPENPHISH_URL}")
+    req = Request(OPENPHISH_URL, headers={'User-Agent': 'Mozilla/5.0'})
     
     try:
         with urlopen(req) as response:
-            compressed_data = response.read()
-            csv_data = bz2.decompress(compressed_data)
+            text_data = response.read().decode('utf-8')
             
-            # Temporary save decompressed CSV
-            temp_csv = output_file.with_name("phishtank_temp.csv")
-            temp_csv.write_bytes(csv_data)
-            
-            # Format to required schema: [url, submission_time]
-            df = pd.read_csv(temp_csv)
-            if "url" not in df.columns:
-                raise ValueError("Expected 'url' column in PhishTank dataset")
+            # OpenPhish feed is a text file with one URL per line
+            urls = [line.strip() for line in text_data.splitlines() if line.strip()]
             
             df_formatted = pd.DataFrame()
-            df_formatted["url"] = df["url"]
-            if "submission_time" in df.columns:
-                df_formatted["submission_time"] = df["submission_time"]
-            else:
-                df_formatted["submission_time"] = pd.Timestamp.now().isoformat()
+            df_formatted["url"] = urls
+            df_formatted["submission_time"] = pd.Timestamp.now().isoformat()
             
             df_formatted.to_csv(output_file, index=False)
-            temp_csv.unlink()
             logging.info(f"Successfully saved {len(df_formatted)} phishing URLs to {output_file}")
             
-    except HTTPError as e:
-        logging.error(f"Failed to download PhishTank data: {e}. Note: The public endpoint has strict rate limits.")
-        raise
     except Exception as e:
-        logging.error(f"Error processing PhishTank data: {e}")
+        logging.error(f"Error processing OpenPhish data: {e}")
         raise
 
 def download_tranco(output_file: Path) -> None:
@@ -80,7 +66,7 @@ def main():
     phishing_csv = data_dir / "phishing_urls.csv"
     legitimate_csv = data_dir / "legitimate_urls.csv"
     
-    download_phishtank(phishing_csv)
+    download_openphish(phishing_csv)
     download_tranco(legitimate_csv)
 
 if __name__ == "__main__":

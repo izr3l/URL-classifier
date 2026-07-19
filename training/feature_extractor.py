@@ -18,7 +18,7 @@ SUSPICIOUS_KEYWORDS = [
     "signin",
 ]
 
-BRANDS = ["paypal", "apple", "google", "microsoft", "amazon", "netflix"]
+BRANDS = ["paypal", "apple", "google", "microsoft", "amazon", "netflix", "facebook", "chase", "bank"]
 SUSPICIOUS_EXTENSIONS = (".exe", ".zip", ".php", ".asp")
 TLD_RISK_SCORES = {
     "tk": 1.0,
@@ -56,6 +56,7 @@ FEATURE_ORDER = [
     "consonant_ratio",
     "suspicious_keyword_count",
     "brand_in_subdomain",
+    "brand_in_registered_domain",
     "lookalike_char_detected",
     "encoded_url_in_path",
     "https_present",
@@ -87,6 +88,7 @@ class FeatureVector:
     consonant_ratio: float
     suspicious_keyword_count: float
     brand_in_subdomain: float
+    brand_in_registered_domain: float
     lookalike_char_detected: float
     encoded_url_in_path: float
     https_present: float
@@ -150,11 +152,17 @@ def extract_feature_vector(url: str) -> FeatureVector:
     query = parsed.query or ""
     path = parsed.path or ""
 
+    domain_prefix = registered_domain.split(".")[0] if registered_domain else ""
+    subdomain_parts = subdomain.lower()
+
+    has_brand_in_registered_domain = any(
+        brand in domain_prefix and domain_prefix != brand for brand in BRANDS
+    )
     has_brand_in_subdomain = any(
-        brand in subdomain and brand not in registered_domain for brand in BRANDS
+        brand in subdomain_parts and domain_prefix != brand for brand in BRANDS
     )
 
-    keyword_haystack = f"{path.lower()} {query.lower()}"
+    keyword_haystack = f"{hostname.lower()} {path.lower()} {query.lower()}"
     suspicious_keyword_count = sum(1 for kw in SUSPICIOUS_KEYWORDS if kw in keyword_haystack)
 
     vector = FeatureVector(
@@ -178,6 +186,7 @@ def extract_feature_vector(url: str) -> FeatureVector:
         consonant_ratio=float(_consonant_ratio(hostname)),
         suspicious_keyword_count=float(suspicious_keyword_count),
         brand_in_subdomain=float(has_brand_in_subdomain),
+        brand_in_registered_domain=float(has_brand_in_registered_domain),
         lookalike_char_detected=float(bool(re.search(r"[013]", f"{hostname}{path}"))),
         encoded_url_in_path=float(bool(re.search(r"http%3a|url=http", f"{path}?{query}", re.IGNORECASE))),
         https_present=float((parsed.scheme or "").lower() == "https"),

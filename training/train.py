@@ -18,10 +18,9 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from xgboost import XGBClassifier
 
 from dataset import DatasetConfig, build_feature_matrix
 from feature_extractor import FEATURE_ORDER
@@ -49,11 +48,13 @@ CONTINUOUS_FEATURES = [
 
 
 def build_preprocessor() -> ColumnTransformer:
-    binary_features = [feature for feature in FEATURE_ORDER if feature not in CONTINUOUS_FEATURES]
+    continuous_indices = [FEATURE_ORDER.index(f) for f in CONTINUOUS_FEATURES]
+    binary_indices = [i for i in range(len(FEATURE_ORDER)) if i not in continuous_indices]
+    
     return ColumnTransformer(
         transformers=[
-            ("continuous", StandardScaler(), CONTINUOUS_FEATURES),
-            ("binary", "passthrough", binary_features),
+            ("continuous", StandardScaler(), continuous_indices),
+            ("binary", "passthrough", binary_indices),
         ]
     )
 
@@ -113,52 +114,12 @@ def train_models(X_train: pd.DataFrame, y_train: np.ndarray, scale_pos_weight: f
         ]
     )
 
-    xgb_base = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            (
-                "model",
-                XGBClassifier(
-                    objective="binary:logistic",
-                    eval_metric="logloss",
-                    n_estimators=300,
-                    learning_rate=0.05,
-                    max_depth=5,
-                    subsample=0.9,
-                    colsample_bytree=0.9,
-                    scale_pos_weight=scale_pos_weight,
-                    random_state=42,
-                    n_jobs=-1,
-                ),
-            ),
-        ]
-    )
-
-    xgb_search = RandomizedSearchCV(
-        estimator=xgb_base,
-        param_distributions={
-            "model__n_estimators": randint(100, 501),
-            "model__max_depth": randint(3, 8),
-            "model__learning_rate": uniform(0.01, 0.09),
-            "model__subsample": uniform(0.7, 0.2),
-            "model__colsample_bytree": uniform(0.7, 0.2),
-        },
-        n_iter=20,
-        cv=3,
-        random_state=42,
-        n_jobs=-1,
-        verbose=1,
-        scoring="f1",
-    )
-
     logistic.fit(X_train, y_train)
     random_forest.fit(X_train, y_train)
-    xgb_search.fit(X_train, y_train)
 
     return {
         "logistic_regression": logistic,
         "random_forest": random_forest,
-        "xgboost": xgb_search.best_estimator_,
     }
 
 
@@ -196,7 +157,7 @@ def main() -> None:
     n_legitimate = int((y_train == 0).sum())
     scale_pos_weight = n_legitimate / max(n_phishing, 1)
 
-    models = train_models(X_train, y_train.to_numpy(), scale_pos_weight=scale_pos_weight)
+    models = train_models(X_train.to_numpy(), y_train.to_numpy(), scale_pos_weight=scale_pos_weight)
 
     model_metrics: dict[str, dict[str, float]] = {}
     best_name = ""
@@ -204,7 +165,7 @@ def main() -> None:
     best_threshold = 0.5
 
     for name, model in models.items():
-        val_probs = model.predict_proba(X_val)[:, 1]
+        val_probs = model.predict_proba(X_val.to_numpy())[:, 1]
         threshold, pr_auc = choose_threshold(y_val.to_numpy(), val_probs)
         metrics = evaluate(y_val.to_numpy(), val_probs, threshold)
         metrics["pr_auc"] = pr_auc
@@ -217,7 +178,7 @@ def main() -> None:
             best_threshold = threshold
 
     best_model = models[best_name]
-    test_probs = best_model.predict_proba(X_test)[:, 1]
+    test_probs = best_model.predict_proba(X_test.to_numpy())[:, 1]
     test_metrics = evaluate(y_test.to_numpy(), test_probs, best_threshold)
     test_metrics["threshold"] = best_threshold
 
@@ -235,9 +196,9 @@ def main() -> None:
         json.dump(FEATURE_ORDER, f, indent=2)
 
     # Feature importance powers explainability in the extension popup.
-    if best_name == "xgboost":
-        xgb_model = best_model.named_steps["model"]
-        importance = pd.Series(xgb_model.feature_importances_, index=FEATURE_ORDER).sort_values(ascending=False)
+    if best_name == "random_forest":
+        rf_model = best_model.named_steps["model"]
+        importance = pd.Series(rf_model.feature_importances_, index=FEATURE_ORDER).sort_values(ascending=False)
         importance.to_json(artifacts_dir / "feature_importance.json", indent=2)
 
     joblib.dump(best_model, artifacts_dir / "model.joblib")

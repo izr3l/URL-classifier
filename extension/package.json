@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:wasm && npm run build:background && npm run build:content && npm run build:popup",
-    "build:wasm": "copyfiles -f node_modules/onnxruntime-web/dist/*.wasm .",
+    "build": "npm run build:wasm && npm run build:offscreen && npm run build:background && npm run build:content && npm run build:popup",
+    "build:wasm": "copyfiles -f node_modules/onnxruntime-web/dist/*.wasm node_modules/onnxruntime-web/dist/*.mjs .",
+    "build:offscreen": "esbuild offscreen/offscreen.ts --bundle --platform=browser --format=iife --outfile=offscreen/offscreen.js",
     "build:background": "esbuild background/service-worker.ts --bundle --platform=browser --format=esm --outfile=background/service-worker.js",
     "build:content": "esbuild content/content-script.ts --bundle --platform=browser --format=iife --outfile=content/content-script.js",
     "build:popup": "esbuild popup/Popup.tsx --bundle --platform=browser --format=esm --outfile=popup/Popup.js"
   },
   "dependencies": {
+    "onnxruntime-node": "^1.27.0",
     "onnxruntime-web": "^1.19.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

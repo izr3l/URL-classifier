@@ -90,26 +90,82 @@ body {
 
 .actions {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .button {
-  display: inline-flex;
-  justify-content: center;
+  display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   border-radius: 9px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  padding: 8px 10px;
-  color: #0f172a;
+  padding: 9px 12px;
   text-decoration: none;
   font-size: 12px;
-  font-weight: 600;
+  transition: all 0.15s ease;
 }
 
-.button:hover {
-  background: #f8fafc;
+.button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.button-content {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.button-title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.button-subtext {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* False Positive (Safe/Green Theme) */
+.button-fp {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.button-fp .button-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.button-fp:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+/* False Negative (Warning/Red Theme) */
+.button-fn {
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #881337;
+}
+
+.button-fn .button-icon {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.button-fn:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
 }
 
 .privacy {
